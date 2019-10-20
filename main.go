@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 )
 
 var (
-	url       = flag.String("url", "", "URL of video to download")
-	chunkSize = flag.Int("chunkSize", 2, "Chunk size in MB")
+	downloadURL = flag.String("url", "", "URL of video to download")
+	chunkSize   = flag.Int("chunkSize", 2, "Chunk size in MB")
 )
 
 func main() {
@@ -21,7 +23,7 @@ func main() {
 	}
 	*chunkSize = *chunkSize * 1000000
 
-	resp, err := http.Head(*url)
+	resp, err := http.Head(*downloadURL)
 	if err != nil {
 		panic(err)
 	}
@@ -32,7 +34,7 @@ func main() {
 	diff := contentLength % *chunkSize
 
 	fmt.Println("Content-Length", contentLength)
-	fmt.Println("URL:", *url)
+	fmt.Println("URL:", *downloadURL)
 	fmt.Println("Chunk Size:", *chunkSize)
 	fmt.Println("Chunks:", chunks)
 	fmt.Println("Diff:", diff)
@@ -46,7 +48,7 @@ func main() {
 		}
 
 		client := &http.Client{}
-		req, err := http.NewRequest(http.MethodGet, *url, nil)
+		req, err := http.NewRequest(http.MethodGet, *downloadURL, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -69,5 +71,18 @@ func main() {
 		body = append(body, data...)
 	}
 
-	ioutil.WriteFile("out", body, 0x777)
+	fname := path.Base(stripQueryString(*downloadURL))
+	err = ioutil.WriteFile(fname, body, 0x777)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func stripQueryString(inputUrl string) string {
+	u, err := url.Parse(inputUrl)
+	if err != nil {
+		panic(err)
+	}
+	u.RawQuery = ""
+	return u.String()
 }
