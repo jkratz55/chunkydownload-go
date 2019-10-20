@@ -9,15 +9,17 @@ import (
 )
 
 var (
-	url = flag.String("url", "", "URL of video to download")
-)
-
-const (
-	limit = 1000
+	url       = flag.String("url", "", "URL of video to download")
+	chunkSize = flag.Int("chunkSize", 2, "Chunk size in MB")
 )
 
 func main() {
 	flag.Parse()
+
+	if *chunkSize < 1 {
+		panic(fmt.Errorf("chunkSize must be at least 1"))
+	}
+	*chunkSize = *chunkSize * 1000000
 
 	resp, err := http.Head(*url)
 	if err != nil {
@@ -25,15 +27,21 @@ func main() {
 	}
 
 	contentLength, err := strconv.Atoi(resp.Header["Content-Length"][0])
-	length := contentLength / limit
+	chunks := contentLength / *chunkSize
 	body := []byte{}
-	diff := contentLength % limit
+	diff := contentLength % *chunkSize
 
-	for i := 0; i < limit; i++ {
-		min := length * i
-		max := length * (i + 1)
+	fmt.Println("Content-Length", contentLength)
+	fmt.Println("URL:", *url)
+	fmt.Println("Chunk Size:", *chunkSize)
+	fmt.Println("Chunks:", chunks)
+	fmt.Println("Diff:", diff)
 
-		if i == limit-1 {
+	for i := 0; i < chunks; i++ {
+		min := *chunkSize * i
+		max := *chunkSize * (i + 1)
+
+		if i == chunks-1 {
 			max += diff
 		}
 
@@ -45,7 +53,7 @@ func main() {
 
 		rangeHeader := "bytes=" + strconv.Itoa(min) + "-" + strconv.Itoa(max-1)
 		req.Header.Add("Range", rangeHeader)
-		fmt.Printf("Sending request; URL: %s, Range: %s \n", *url, rangeHeader)
+		fmt.Printf("Sending request; Range: %s \n", rangeHeader)
 		resp, err := client.Do(req)
 		if err != nil {
 			panic(err)
